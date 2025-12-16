@@ -1,5 +1,6 @@
 import streamlit as st
 from abc import ABC, abstractmethod
+import random
 
 # ================== DATA ==================
 
@@ -68,7 +69,7 @@ class Plane(Transport):
 
 # ================== UI ==================
 
-st.title("🌍 Интерактивен туристически планер")
+st.title("🌍 Интерактивен туристически планер с иновации")
 
 route_choice = st.selectbox(
     "Избери маршрут:",
@@ -80,12 +81,16 @@ transport_choice = st.selectbox(
     ["Кола", "Влак", "Самолет"]
 )
 
-days = st.slider("Брой дни за пътуването:", 1, 10, 4)
+# Брой дни за всеки град
+cities = routes[route_choice]
+days_per_city = {}
+st.subheader("📅 Задай брой дни за всеки град")
+for city in cities:
+    days_per_city[city] = st.slider(f"{city}:", 1, 5, 1)
+
 budget = st.number_input("Твоят бюджет (лв):", 300, 5000, 1500)
 
 if st.button("Планирай пътуването 🧭"):
-
-    cities = routes[route_choice]
 
     # Избор на транспорт
     if transport_choice == "Кола":
@@ -104,15 +109,29 @@ if st.button("Планирай пътуването 🧭"):
     total_food_cost = 0
     total_hotel_cost = 0
 
+    # Списък за графика
+    city_names = []
+    city_costs = []
+
     for city in cities:
         info = city_info[city]
+        city_days = days_per_city[city]
+
         st.markdown(f"### 📍 {city}")
         st.write(f"🏨 **Хотел:** {info['hotel'][0]} – {info['hotel'][1]} лв/нощ")
         st.write(f"🍽️ **Храна:** {info['food'][0]} – {info['food'][1]} лв/ден")
         st.write(f"🏛️ **Забележителност:** {info['sight']}")
 
-        total_food_cost += info['food'][1] * days
-        total_hotel_cost += info['hotel'][1] * days
+        # Случайна допълнителна активност
+        extras = ["Пешеходна обиколка", "Местен музикален концерт", "Кулинарен тур", "Музейна визита"]
+        extra_activity = random.choice(extras)
+        st.info(f"🎯 Препоръчана допълнителна активност: {extra_activity}")
+
+        total_food_cost += info['food'][1] * city_days
+        total_hotel_cost += info['hotel'][1] * city_days
+
+        city_names.append(city)
+        city_costs.append(info['food'][1] * city_days + info['hotel'][1] * city_days)
 
     # ================== COST CALCULATION ==================
     total_distance = DISTANCE_BETWEEN_CITIES * (len(cities) - 1)
@@ -131,3 +150,12 @@ if st.button("Планирай пътуването 🧭"):
         st.success("✅ Бюджетът е достатъчен! Приятно пътуване ✨")
     else:
         st.error("❌ Бюджетът не достига. Помисли за по-евтин транспорт или по-малко дни.")
+
+    # ================== BAR CHART ==================
+    st.subheader("📊 Разходи по градове")
+    st.bar_chart(data=dict(zip(city_names, city_costs)))
+
+    # ================== ASCII/Emoji карта ==================
+    st.subheader("🗺️ Маршрут (символична карта)")
+    map_line = " ➡️ ".join([f"🏙️ {city}" for city in cities])
+    st.text(map_line)
