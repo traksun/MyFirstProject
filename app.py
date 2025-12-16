@@ -1,9 +1,10 @@
 import streamlit as st
 from abc import ABC, abstractmethod
 import pandas as pd
+import folium
+from streamlit_folium import st_folium
 
 # ================== DATA ==================
-
 routes = {
     "България → Германия": ["София", "Белград", "Виена", "Мюнхен"],
     "България → Италия": ["София", "Любляна", "Венеция", "Рим"]
@@ -22,7 +23,6 @@ city_info = {
 DISTANCE_BETWEEN_CITIES = 300  # км (опростено)
 
 # ================== OOP ==================
-
 class Transport(ABC):
     def __init__(self, price_per_km):
         self.price_per_km = price_per_km
@@ -46,7 +46,7 @@ class Car(Transport):
         return "🚗 Кола"
 
     def travel_time(self, distance):
-        return distance / 80  # средна скорост 80 км/ч
+        return distance / 80
 
 class Train(Transport):
     def __init__(self):
@@ -56,7 +56,7 @@ class Train(Transport):
         return "🚆 Влак"
 
     def travel_time(self, distance):
-        return distance / 120  # средна скорост 120 км/ч
+        return distance / 120
 
 class Plane(Transport):
     def __init__(self):
@@ -66,10 +66,9 @@ class Plane(Transport):
         return "✈️ Самолет"
 
     def travel_time(self, distance):
-        return distance / 600  # средна скорост 600 км/ч
+        return distance / 600
 
 # ================== UI ==================
-
 st.title("🌍 Интерактивен туристически планер")
 
 route_choice = st.selectbox("Избери маршрут:", list(routes.keys()))
@@ -82,23 +81,16 @@ if st.button("Планирай пътуването 🧭"):
     cities = routes[route_choice]
 
     # Избор на транспорт
-    if transport_choice == "Кола":
-        transport = Car()
-    elif transport_choice == "Влак":
-        transport = Train()
-    else:
-        transport = Plane()
+    transport = {"Кола": Car(), "Влак": Train(), "Самолет": Plane()}[transport_choice]
 
     st.subheader("🗺️ Маршрут")
     st.write(" ➡️ ".join(cities))
-
-    # ================== CITY DETAILS ==================
-    st.subheader("🏙️ Спирки и предложения")
 
     total_food_cost = 0
     total_hotel_cost = 0
     total_entry_cost = 0
 
+    st.subheader("🏙️ Спирки и предложения")
     for city in cities:
         info = city_info[city]
         st.markdown(f"### 📍 {city}")
@@ -115,7 +107,6 @@ if st.button("Планирай пътуването 🧭"):
     travel_time = transport.travel_time(total_distance)
     total_cost = transport_cost + total_food_cost + total_hotel_cost + total_entry_cost
 
-    # ================== RESULTS ==================
     st.subheader("💰 Разходи")
     st.write(f"{transport.name()} – транспорт: {transport_cost:.2f} лв, време: {travel_time:.2f} ч")
     st.write(f"🍽️ Храна: {total_food_cost:.2f} лв")
@@ -124,11 +115,7 @@ if st.button("Планирай пътуването 🧭"):
 
     st.markdown("---")
     st.write(f"## 💵 Общ бюджет: **{total_cost:.2f} лв**")
-
-    if total_cost <= budget:
-        st.success("✅ Бюджетът е достатъчен! Приятно пътуване ✨")
-    else:
-        st.error("❌ Бюджетът не достига. Помисли за по-евтин транспорт или по-малко дни.")
+    st.success("✅ Бюджетът е достатъчен! Приятно пътуване ✨") if total_cost <= budget else st.error("❌ Бюджетът не достига.")
 
     # ================== BUDGET CHART ==================
     st.subheader("📊 Разпределение на разходите")
@@ -143,15 +130,13 @@ if st.button("Планирай пътуването 🧭"):
     start_coords = city_info[cities[0]]["coords"]
     m = folium.Map(location=start_coords, zoom_start=5)
 
-    # Добавяне на маркери
+    # Добавяне на маркери и линии
+    prev_coords = None
     for city in cities:
         coords = city_info[city]["coords"]
         folium.Marker(coords, popup=f"{city}: {city_info[city]['sight']}").add_to(m)
-
-    # Линии между градовете
-    for i in range(len(cities)-1):
-        coords1 = city_info[cities[i]]["coords"]
-        coords2 = city_info[cities[i+1]]["coords"]
-        folium.PolyLine([coords1, coords2], color="blue", weight=3, opacity=0.7).add_to(m)
+        if prev_coords:
+            folium.PolyLine([prev_coords, coords], color="blue", weight=3, opacity=0.7).add_to(m)
+        prev_coords = coords
 
     st_folium(m, width=700, height=500)
