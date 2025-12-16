@@ -160,4 +160,4 @@ if st.button("Планирай пътуването 🧭"):
     folium.PolyLine(coords_list, color="blue", weight=3, opacity=0.7).add_to(m)
 
     # Показване в Streamlit
-    st_data = st_folium(m, width=700, height=500)
+    st_folium(m, width=700, height=500)
