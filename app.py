@@ -143,7 +143,6 @@ if st.button("🧭 Планирай пътуването"):
     deck = pdk.Deck(
         layers=[layer_path, layer_points],
         initial_view_state=view_state,
-        map_style="mapbox://styles/mapbox/light-v9"
     )
 
     st.pydeck_chart(deck)
