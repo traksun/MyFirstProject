@@ -1,1 +1,2 @@
-streamlit
+pip install streamlit folium streamlit-folium
+streamlit run app.py
