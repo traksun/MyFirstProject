@@ -1,7 +1,6 @@
 import streamlit as st
 from abc import ABC, abstractmethod
 import pandas as pd
-import folium
 from streamlit_folium import st_folium
 
 # ================== DATA ==================
