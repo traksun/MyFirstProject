@@ -1,6 +1,8 @@
 import streamlit as st
-from abc import ABC, abstractmethod
 import pandas as pd
+import pydeck as pdk
+from abc import ABC, abstractmethod
+from fpdf import FPDF
 
 # ================== DATA ==================
 
@@ -9,182 +11,127 @@ routes = {
 }
 
 city_info = {
-    "София": {
-        "hotel": ("Hotel Sofia Center", 70),
-        "food": ("Традиционна българска кухня", 20),
-        "sight": "Катедралата Александър Невски",
-        "ticket": 10,
-        "lat": 42.6977,
-        "lon": 23.3219
-    },
-    "Белград": {
-        "hotel": ("Belgrade Inn", 65),
-        "food": ("Сръбска скара", 22),
-        "sight": "Калемегдан",
-        "ticket": 8,
-        "lat": 44.7866,
-        "lon": 20.4489
-    },
-    "Виена": {
-        "hotel": ("Vienna City Hotel", 90),
-        "food": ("Виенски шницел", 30),
-        "sight": "Дворецът Шьонбрун",
-        "ticket": 18,
-        "lat": 48.2082,
-        "lon": 16.3738
-    },
-    "Мюнхен": {
-        "hotel": ("Munich Central Hotel", 95),
-        "food": ("Немска кухня", 28),
-        "sight": "Мариенплац",
-        "ticket": 15,
-        "lat": 48.1351,
-        "lon": 11.5820
-    }
+    "София": {"lat": 42.6977, "lon": 23.3219, "tip": "Посети центъра и Витоша."},
+    "Белград": {"lat": 44.7866, "lon": 20.4489, "tip": "Калемегдан и нощният живот."},
+    "Виена": {"lat": 48.2082, "lon": 16.3738, "tip": "Музеи и дворци."},
+    "Мюнхен": {"lat": 48.1351, "lon": 11.5820, "tip": "Мариенплац и бирарии."}
 }
 
 DISTANCE_BETWEEN_CITIES = 300
-EXTRA_COSTS = 50
 
 # ================== OOP ==================
 
 class Transport(ABC):
-    def __init__(self, price_per_km, co2_per_km):
-        self.price_per_km = price_per_km
-        self.co2_per_km = co2_per_km
+    def __init__(self, price, co2):
+        self.price = price
+        self.co2 = co2
+
+    def cost(self, dist): return dist * self.price
+    def emissions(self, dist): return dist * self.co2
 
     @abstractmethod
-    def name(self):
-        pass
-
-    def travel_cost(self, distance):
-        return distance * self.price_per_km
-
-    def co2_emissions(self, distance):
-        return distance * self.co2_per_km
+    def name(self): pass
 
 
 class Car(Transport):
-    def __init__(self):
-        super().__init__(0.25, 0.18)
-
-    def name(self):
-        return "🚗 Кола"
+    def __init__(self): super().__init__(0.25, 0.18)
+    def name(self): return "🚗 Кола"
 
 
 class Train(Transport):
-    def __init__(self):
-        super().__init__(0.18, 0.05)
-
-    def name(self):
-        return "🚆 Влак"
+    def __init__(self): super().__init__(0.18, 0.05)
+    def name(self): return "🚆 Влак"
 
 
 class Plane(Transport):
-    def __init__(self):
-        super().__init__(0.45, 0.25)
+    def __init__(self): super().__init__(0.45, 0.25)
+    def name(self): return "✈️ Самолет"
 
-    def name(self):
-        return "✈️ Самолет"
+# ================== AI ASSISTANT ==================
 
+def ai_assistant(city, question):
+    if "какво" in question.lower():
+        return city_info[city]["tip"]
+    return "Опитай местната кухня и централните зони."
 
-# ================== SMART LOGIC ==================
+# ================== PDF ==================
 
-def recommend_transport(budget, days):
-    if budget < 800:
-        return Train()
-    elif days <= 3:
-        return Plane()
-    return Car()
+def generate_pdf(cities, transport, cost):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    pdf.cell(0, 10, "Туристически план", ln=True)
 
+    for c in cities:
+        pdf.cell(0, 10, f"- {c}", ln=True)
 
-def profile_multiplier(profile):
-    return {"🎒 Бекпекър": 0.85, "💼 Бизнес": 1.25}.get(profile, 1.0)
+    pdf.cell(0, 10, f"Транспорт: {transport.name()}", ln=True)
+    pdf.cell(0, 10, f"Обща цена: {cost:.2f} лв", ln=True)
 
+    return pdf.output(dest="S").encode("latin-1")
 
 # ================== UI ==================
 
-st.set_page_config(page_title="Туристически планер", layout="wide")
+st.set_page_config("Туристически планер", layout="wide")
 st.title("🌍 Интерактивен туристически планер")
 
-route_choice = st.selectbox("🗺️ Избери маршрут:", list(routes.keys()))
-profile = st.selectbox("👤 Тип пътуване:", ["🎒 Бекпекър", "👨‍👩‍👧 Семейство", "💼 Бизнес"])
-days = st.slider("📅 Брой дни:", 1, 14, 4)
-budget = st.number_input("💰 Бюджет (лв):", 300, 6000, 1500)
+days = st.slider("📅 Брой дни", 1, 14, 4)
+budget = st.number_input("💰 Бюджет", 300, 6000, 1500)
+transport_choice = st.selectbox("🚍 Транспорт", ["Кола", "Влак", "Самолет"])
 
-smart_mode = st.checkbox("🤖 Автоматична препоръка за транспорт")
+transport = {"Кола": Car(), "Влак": Train(), "Самолет": Plane()}[transport_choice]
+cities = routes["България → Германия"]
 
-transport_choice = st.selectbox(
-    "🚍 Превозно средство:",
-    ["Кола", "Влак", "Самолет"],
-    disabled=smart_mode
+# ================== PYDECK MAP ==================
+
+coords = [(city_info[c]["lon"], city_info[c]["lat"]) for c in cities]
+
+layer = pdk.Layer(
+    "PathLayer",
+    data=[{"path": coords}],
+    get_path="path",
+    width_scale=20,
+    width_min_pixels=4,
+    get_color=[255, 0, 0]
 )
 
-if st.button("🧭 Планирай пътуването"):
+view = pdk.ViewState(latitude=46, longitude=18, zoom=4)
 
-    cities = routes[route_choice]
-    days_per_city = max(1, days // len(cities))
-    multiplier = profile_multiplier(profile)
+st.pydeck_chart(pdk.Deck(layers=[layer], initial_view_state=view))
 
-    transport = recommend_transport(budget, days) if smart_mode else {
-        "Кола": Car(),
-        "Влак": Train(),
-        "Самолет": Plane()
-    }[transport_choice]
+# ================== COSTS ==================
 
-    st.subheader("🗺️ Маршрут")
-    st.write(" ➡️ ".join(cities))
+distance = DISTANCE_BETWEEN_CITIES * (len(cities) - 1)
+cost = transport.cost(distance)
+co2 = transport.emissions(distance)
 
-    # ================== MAP ==================
-    st.subheader("🗺️ Интерактивна карта на маршрута")
+st.subheader("💰 Разходи")
+st.write(f"{transport.name()} – {cost:.2f} лв")
+st.write(f"🌱 CO₂ – {co2:.1f} kg")
 
-    map_data = pd.DataFrame([
-        {"lat": city_info[city]["lat"], "lon": city_info[city]["lon"]}
-        for city in cities
-    ])
+# ================== RISK ANALYSIS ==================
 
-    st.map(map_data)
+st.subheader("⚠️ Риск анализ")
 
-    # ================== CITY DETAILS ==================
-    total_food = total_hotel = total_tickets = 0
+if cost > budget * 0.8:
+    st.warning("Бюджетът е почти изчерпан")
 
-    st.subheader("🏙️ Спирки")
+if co2 > 200:
+    st.warning("Висок CO₂ отпечатък")
 
-    for city in cities:
-        info = city_info[city]
+if distance > 800:
+    st.warning("Дълъг маршрут")
 
-        with st.expander(f"📍 {city}"):
-            st.write(f"🏨 {info['hotel'][0]} – {info['hotel'][1]} лв/нощ")
-            st.write(f"🍽️ {info['food'][0]} – {info['food'][1]} лв/ден")
-            st.write(f"🏛️ {info['sight']} – {info['ticket']} лв")
-            st.write(f"⏱️ Дни: {days_per_city}")
+# ================== AI CHAT ==================
 
-        total_food += info['food'][1] * days_per_city
-        total_hotel += info['hotel'][1] * days_per_city
-        total_tickets += info['ticket']
+st.subheader("🤖 AI туристически асистент")
+city = st.selectbox("Град", cities)
+question = st.text_input("Въпрос")
 
-    # ================== COSTS ==================
-    distance = DISTANCE_BETWEEN_CITIES * (len(cities) - 1)
-    transport_cost = transport.travel_cost(distance)
-    co2 = transport.co2_emissions(distance)
+if question:
+    st.info(ai_assistant(city, question))
 
-    total_cost = (transport_cost + total_food + total_hotel + total_tickets + EXTRA_COSTS) * multiplier
+# ================== PDF ==================
 
-    st.subheader("💰 Разходи")
-    st.write(f"{transport.name()} – {transport_cost:.2f} лв")
-    st.write(f"🍽️ Храна – {total_food:.2f} лв")
-    st.write(f"🏨 Хотели – {total_hotel:.2f} лв")
-    st.write(f"🎟️ Входове – {total_tickets:.2f} лв")
-    st.write(f"🛍️ Допълнителни – {EXTRA_COSTS:.2f} лв")
-    st.write(f"🌱 CO₂ отпечатък – {co2:.1f} kg")
-
-    st.markdown("---")
-    st.write(f"## 💵 Общо: **{total_cost:.2f} лв**")
-
-    if total_cost <= budget:
-        st.success("✅ Бюджетът е достатъчен!")
-    else:
-        st.error("❌ Бюджетът не достига.")
-
-    rating = st.slider("⭐ Оцени плана:", 1, 5)
-    st.write("⭐" * rating)
+pdf_data = generate_pdf(cities, transport, cost)
+st.download_button("📄 Изтегли PDF", pdf_data, "plan.pdf")
