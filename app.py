@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from abc import ABC, abstractmethod
+import pydeck as pdk
 
 # ================== DATA ==================
 
@@ -74,7 +75,6 @@ class Plane(Transport):
     def name(self):
         return "✈️ Самолет"
 
-
 # ================== UI ==================
 
 st.title("🌍 Интерактивен туристически планер")
@@ -105,12 +105,47 @@ if st.button("🧭 Планирай пътуването"):
     st.subheader("🗺️ Маршрут")
     st.write(" ➡️ ".join(cities))
 
-    # ===== КАРТА ВЕДНАГА СЛЕД МАРШРУТА =====
+    # ===== КАРТА С ЛИНИЯ =====
     st.subheader("🗺️ Карта на маршрута")
-    st.map([
-        {"lat": city_info[c]["coords"][0], "lon": city_info[c]["coords"][1]}
+
+    route_coords = [
+        city_info[c]["coords"][::-1]  # pydeck използва [lon, lat]
         for c in cities
-    ])
+    ]
+
+    layer_path = pdk.Layer(
+        "PathLayer",
+        data=[{"path": route_coords}],
+        get_path="path",
+        get_width=5,
+        get_color=[255, 0, 0],
+        width_scale=10,
+        width_min_pixels=2,
+    )
+
+    layer_points = pdk.Layer(
+        "ScatterplotLayer",
+        data=[
+            {"lat": city_info[c]["coords"][0], "lon": city_info[c]["coords"][1]}
+            for c in cities
+        ],
+        get_position="[lon, lat]",
+        get_radius=8000,
+        get_fill_color=[0, 0, 255],
+    )
+
+    view_state = pdk.ViewState(
+        latitude=45,
+        longitude=18,
+        zoom=4.5,
+    )
+
+    deck = pdk.Deck(
+        layers=[layer_path, layer_points],
+        initial_view_state=view_state,
+    )
+
+    st.pydeck_chart(deck)
 
     # ================== DAYS ==================
 
