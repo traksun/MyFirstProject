@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import pydeck as pdk
 from abc import ABC, abstractmethod
 
 # ================== DATA ==================
@@ -41,7 +40,7 @@ DISTANCE_BETWEEN_CITIES = 300  # км
 # ================== OOP ==================
 
 class Transport(ABC):
-    def __init__(self, price_per_km):
+    def init(self, price_per_km):
         self.price_per_km = price_per_km
 
     @abstractmethod
@@ -53,24 +52,24 @@ class Transport(ABC):
 
 
 class Car(Transport):
-    def __init__(self):
-        super().__init__(0.25)
+    def init(self):
+        super().init(0.25)
 
     def name(self):
         return "🚗 Кола"
 
 
 class Train(Transport):
-    def __init__(self):
-        super().__init__(0.18)
+    def init(self):
+        super().init(0.18)
 
     def name(self):
         return "🚆 Влак"
 
 
 class Plane(Transport):
-    def __init__(self):
-        super().__init__(0.45)
+    def init(self):
+        super().init(0.45)
 
     def name(self):
         return "✈️ Самолет"
@@ -78,7 +77,6 @@ class Plane(Transport):
 
 # ================== UI ==================
 
-st.set_page_config(page_title="Туристически планер", layout="wide")
 st.title("🌍 Интерактивен туристически планер")
 
 route_choice = st.selectbox("Избери маршрут:", list(routes.keys()))
@@ -97,17 +95,13 @@ traveler_type = st.radio(
 if st.button("🧭 Планирай пътуването"):
     cities = routes[route_choice]
 
-    transport = {
-        "Кола": Car(),
-        "Влак": Train(),
-        "Самолет": Plane()
-    }[transport_choice]
+    # Полиморфизъм
+    transport = {"Кола": Car(), "Влак": Train(), "Самолет": Plane()}[transport_choice]
 
     st.subheader("🗺️ Маршрут")
     st.write(" ➡️ ".join(cities))
 
     # ================== DAYS PER CITY ==================
-
     st.subheader("📅 Дни по градове")
     days_per_city = {}
     remaining_days = days
@@ -123,7 +117,6 @@ if st.button("🧭 Планирай пътуването"):
         remaining_days -= d
 
     # ================== COSTS ==================
-
     total_food = 0
     total_hotel = 0
 
@@ -136,6 +129,7 @@ if st.button("🧭 Планирай пътуването"):
         hotel_price = info["hotel"][1]
         food_price = info["food"][1]
 
+        # Тип турист
         if traveler_type == "🎒 Бюджетен":
             hotel_price *= 0.8
         elif traveler_type == "👨‍👩‍👧 Семеен":
@@ -152,21 +146,19 @@ if st.button("🧭 Планирай пътуването"):
         total_hotel += hotel_price * d
 
     # ================== TRANSPORT ==================
-
     total_distance = DISTANCE_BETWEEN_CITIES * (len(cities) - 1)
     transport_cost = transport.travel_cost(total_distance)
 
     total_cost = total_food + total_hotel + transport_cost
 
     # ================== RESULTS ==================
-
     st.subheader("💰 Разходи")
     st.write(f"{transport.name()} Транспорт: {transport_cost:.2f} лв")
     st.write(f"🍽️ Храна: {total_food:.2f} лв")
     st.write(f"🏨 Хотели: {total_hotel:.2f} лв")
 
     st.markdown("---")
-    st.write(f"## 💵 Общо: **{total_cost:.2f} лв**")
+    st.write(f"## 💵 Общо: {total_cost:.2f} лв")
 
     if total_cost <= budget:
         st.success("✅ Бюджетът е достатъчен!")
@@ -174,7 +166,6 @@ if st.button("🧭 Планирай пътуването"):
         st.error("❌ Бюджетът не достига!")
 
     # ================== CHART ==================
-
     st.subheader("📊 Графика на разходите")
     df = pd.DataFrame({
         "Категория": ["Транспорт", "Храна", "Хотели"],
@@ -183,58 +174,15 @@ if st.button("🧭 Планирай пътуването"):
     st.bar_chart(df.set_index("Категория"))
 
     # ================== MAP ==================
-
     st.subheader("🗺️ Карта на маршрута")
-
-    route_points = [
-        {
-            "city": city,
-            "lat": city_info[city]["coords"][0],
-            "lon": city_info[city]["coords"][1]
-        }
-        for city in cities
-    ]
-
-    route_path = [{
-        "path": [[p["lon"], p["lat"]] for p in route_points]
-    }]
-
-    deck = pdk.Deck(
-        map_style="mapbox://styles/mapbox/streets-v11",
-        initial_view_state=pdk.ViewState(
-            latitude=route_points[0]["lat"],
-            longitude=route_points[0]["lon"],
-            zoom=5,
-        ),
-        layers=[
-            pdk.Layer(
-                "ScatterplotLayer",
-                data=route_points,
-                get_position="[lon, lat]",
-                get_radius=50000,
-                get_fill_color=[255, 0, 0],
-                pickable=True,
-            ),
-            pdk.Layer(
-                "PathLayer",
-                data=route_path,
-                get_path="path",
-                get_width=5,
-                get_color=[0, 0, 255],
-            ),
-        ],
-        tooltip={"text": "{city}"}
-    )
-
-    st.pydeck_chart(deck)
+    st.map([{"lat": city_info[c]["coords"][0], "lon": city_info[c]["coords"][1]} for c in cities])
 
     # ================== EDUCATIONAL ==================
-
     with st.expander("📚 Какво учим с това приложение?"):
         st.write("""
         • Обектно-ориентирано програмиране  
-        • Абстрактни класове и полиморфизъм  
-        • Работа с данни и визуализация  
+        • Полиморфизъм  
+        • Работа с данни  
         • Географско планиране  
-        • Анализ и бюджетиране
+        • Бюджетиране и анализ
         """)
