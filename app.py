@@ -104,6 +104,14 @@ if st.button("🧭 Планирай пътуването"):
     st.subheader("🗺️ Маршрут")
     st.write(" ➡️ ".join(cities))
 
+# ================== MAP ==================
+
+     st.subheader("🗺️ Карта на маршрута")
+    st.map([
+        {"lat": city_info[c]["coords"][0], "lon": city_info[c]["coords"][1]}
+        for c in cities
+    ])
+
     # ================== DAYS ==================
 
     st.subheader("📅 Дни по градове")
@@ -179,11 +187,3 @@ if st.button("🧭 Планирай пътуването"):
         "Цена": [transport_cost, total_food, total_hotel]
     })
     st.bar_chart(df.set_index("Категория"))
-
-    # ================== MAP ==================
-
-    st.subheader("🗺️ Карта на маршрута")
-    st.map([
-        {"lat": city_info[c]["coords"][0], "lon": city_info[c]["coords"][1]}
-        for c in cities
-    ])
