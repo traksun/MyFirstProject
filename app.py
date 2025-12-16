@@ -1,185 +1,163 @@
 import streamlit as st
-import pydeck as pdk
 from abc import ABC, abstractmethod
+import folium
+from streamlit_folium import st_folium
 
 # ================== DATA ==================
 
 routes = {
-    "Bulgaria → Germany": ["Sofia", "Belgrade", "Vienna", "Munich"]
+    "България → Германия": ["София", "Белград", "Виена", "Мюнхен"]
 }
 
 city_info = {
-    "Sofia": {
-        "lat": 42.6977, "lon": 23.3219,
-        "hotel": 70, "food": 20, "ticket": 10,
-        "tip": "Visit the city center and Vitosha mountain."
+    "София": {
+        "hotel": ("Hotel Sofia Center", 70),
+        "food": ("Традиционна българска кухня", 20),
+        "sight": "Катедралата Александър Невски",
+        "coords": (42.6977, 23.3219)
     },
-    "Belgrade": {
-        "lat": 44.7866, "lon": 20.4489,
-        "hotel": 65, "food": 22, "ticket": 8,
-        "tip": "Kalemegdan and nightlife."
+    "Белград": {
+        "hotel": ("Belgrade Inn", 65),
+        "food": ("Сръбска скара", 22),
+        "sight": "Калемегдан",
+        "coords": (44.8176, 20.4569)
     },
-    "Vienna": {
-        "lat": 48.2082, "lon": 16.3738,
-        "hotel": 90, "food": 30, "ticket": 18,
-        "tip": "Palaces, museums, and classical music."
+    "Виена": {
+        "hotel": ("Vienna City Hotel", 90),
+        "food": ("Виенски шницел", 30),
+        "sight": "Дворецът Шьонбрун",
+        "coords": (48.2082, 16.3738)
     },
-    "Munich": {
-        "lat": 48.1351, "lon": 11.5820,
-        "hotel": 95, "food": 28, "ticket": 15,
-        "tip": "Marienplatz and Bavarian beer."
+    "Мюнхен": {
+        "hotel": ("Munich Central Hotel", 95),
+        "food": ("Немска кухня", 28),
+        "sight": "Мариенплац",
+        "coords": (48.1351, 11.5820)
     }
 }
 
-DISTANCE_BETWEEN_CITIES = 300
-EXTRA_COSTS = 50
+DISTANCE_BETWEEN_CITIES = 300  # км (опростено)
 
 # ================== OOP ==================
 
 class Transport(ABC):
-    def __init__(self, price_per_km, co2_per_km):
-        self.price = price_per_km
-        self.co2 = co2_per_km
-
-    def cost(self, distance):
-        return distance * self.price
-
-    def emissions(self, distance):
-        return distance * self.co2
+    def __init__(self, price_per_km):
+        self.price_per_km = price_per_km
 
     @abstractmethod
     def name(self):
         pass
 
+    def travel_cost(self, distance):
+        return distance * self.price_per_km
 
 class Car(Transport):
     def __init__(self):
-        super().__init__(0.25, 0.18)
+        super().__init__(0.25)
 
     def name(self):
-        return "Car"
-
+        return "🚗 Кола"
 
 class Train(Transport):
     def __init__(self):
-        super().__init__(0.18, 0.05)
+        super().__init__(0.18)
 
     def name(self):
-        return "Train"
-
+        return "🚆 Влак"
 
 class Plane(Transport):
     def __init__(self):
-        super().__init__(0.45, 0.25)
+        super().__init__(0.45)
 
     def name(self):
-        return "Plane"
-
-# ================== AI ASSISTANT ==================
-
-def ai_assistant(city, question):
-    q = question.lower()
-    if "what" in q or "do" in q:
-        return city_info[city]["tip"]
-    if "food" in q:
-        return "Try the local cuisine around the city center."
-    return "Walking in the city center is always a good choice."
+        return "✈️ Самолет"
 
 # ================== UI ==================
 
-st.set_page_config(page_title="Interactive Travel Planner", layout="wide")
-st.title("Interactive Travel Planner")
+st.title("🌍 Интерактивен туристически планер с карта")
 
-route = st.selectbox("Route", list(routes.keys()))
-days = st.slider("Number of days", 1, 14, 4)
-budget = st.number_input("Budget (BGN)", 300, 6000, 1500)
-transport_choice = st.selectbox("Transport", ["Car", "Train", "Plane"])
-
-transport = {"Car": Car(), "Train": Train(), "Plane": Plane()}[transport_choice]
-cities = routes[route]
-days_per_city = max(1, days // len(cities))
-
-# ================== PYDECK MAP ==================
-
-st.subheader("Travel Route Map")
-
-path = [(city_info[c]["lon"], city_info[c]["lat"]) for c in cities]
-
-layer = pdk.Layer(
-    "PathLayer",
-    data=[{"path": path}],
-    get_path="path",
-    get_color=[255, 0, 0],
-    width_scale=20,
-    width_min_pixels=4
+route_choice = st.selectbox(
+    "Избери маршрут:",
+    list(routes.keys())
 )
 
-view_state = pdk.ViewState(latitude=46, longitude=18, zoom=4)
-
-st.pydeck_chart(pdk.Deck(layers=[layer], initial_view_state=view_state))
-
-# ================== COSTS ==================
-
-total_food = total_hotel = total_tickets = 0
-
-for c in cities:
-    total_food += city_info[c]["food"] * days_per_city
-    total_hotel += city_info[c]["hotel"] * days_per_city
-    total_tickets += city_info[c]["ticket"]
-
-distance = DISTANCE_BETWEEN_CITIES * (len(cities) - 1)
-transport_cost = transport.cost(distance)
-co2 = transport.emissions(distance)
-
-total_cost = transport_cost + total_food + total_hotel + total_tickets + EXTRA_COSTS
-
-st.subheader("Expenses")
-st.write(f"{transport.name()} – {transport_cost:.2f} BGN")
-st.write(f"Food – {total_food:.2f} BGN")
-st.write(f"Hotels – {total_hotel:.2f} BGN")
-st.write(f"Tickets – {total_tickets:.2f} BGN")
-st.write(f"Extras – {EXTRA_COSTS:.2f} BGN")
-st.write(f"CO₂ – {co2:.1f} kg")
-
-st.markdown("---")
-st.write(f"## Total: {total_cost:.2f} BGN")
-
-# ================== RISK ANALYSIS ==================
-
-st.subheader("Risk Analysis")
-
-if total_cost > budget * 0.8:
-    st.warning("⚠️ Budget is almost exceeded")
-
-if co2 > 200:
-    st.warning("⚠️ High CO₂ footprint")
-
-if distance > 800:
-    st.warning("⚠️ Long travel distance")
-
-# ================== AI CHAT ==================
-
-st.subheader("AI Travel Assistant")
-city = st.selectbox("City", cities)
-question = st.text_input("Ask a question")
-
-if question:
-    st.info(ai_assistant(city, question))
-
-# ================== EXPORT (TXT) ==================
-
-plan_text = f"""
-TRAVEL PLAN
-
-Route: {' -> '.join(cities)}
-Transport: {transport.name()}
-Total cost: {total_cost:.2f} BGN
-CO₂ footprint: {co2:.1f} kg
-"""
-
-st.download_button(
-    "Download Plan (TXT)",
-    plan_text,
-    file_name="travel_plan.txt",
-    mime="text/plain"
+transport_choice = st.selectbox(
+    "Превозно средство:",
+    ["Кола", "Влак", "Самолет"]
 )
+
+days = st.slider("Брой дни за пътуването:", 1, 10, 4)
+budget = st.number_input("Твоят бюджет (лв):", 300, 5000, 1500)
+
+if st.button("Планирай пътуването 🧭"):
+
+    cities = routes[route_choice]
+
+    # Избор на транспорт
+    if transport_choice == "Кола":
+        transport = Car()
+    elif transport_choice == "Влак":
+        transport = Train()
+    else:
+        transport = Plane()
+
+    st.subheader("🗺️ Маршрут")
+    st.write(" ➡️ ".join(cities))
+
+    # ================== CITY DETAILS ==================
+    st.subheader("🏙️ Спирки и предложения")
+
+    total_food_cost = 0
+    total_hotel_cost = 0
+
+    for city in cities:
+        info = city_info[city]
+        st.markdown(f"### 📍 {city}")
+        st.write(f"🏨 **Хотел:** {info['hotel'][0]} – {info['hotel'][1]} лв/нощ")
+        st.write(f"🍽️ **Храна:** {info['food'][0]} – {info['food'][1]} лв/ден")
+        st.write(f"🏛️ **Забележителност:** {info['sight']}")
+
+        total_food_cost += info['food'][1] * days
+        total_hotel_cost += info['hotel'][1] * days
+
+    # ================== COST CALCULATION ==================
+    total_distance = DISTANCE_BETWEEN_CITIES * (len(cities) - 1)
+    transport_cost = transport.travel_cost(total_distance)
+    total_cost = transport_cost + total_food_cost + total_hotel_cost
+
+    # ================== RESULTS ==================
+    st.subheader("💰 Разходи")
+    st.write(f"{transport.name()} – транспорт: {transport_cost:.2f} лв")
+    st.write(f"🍽️ Храна: {total_food_cost:.2f} лв")
+    st.write(f"🏨 Хотели: {total_hotel_cost:.2f} лв")
+    st.markdown("---")
+    st.write(f"## 💵 Общ бюджет: **{total_cost:.2f} лв**")
+
+    if total_cost <= budget:
+        st.success("✅ Бюджетът е достатъчен! Приятно пътуване ✨")
+    else:
+        st.error("❌ Бюджетът не достига. Помисли за по-евтин транспорт или по-малко дни.")
+
+    # ================== MAP ==================
+    st.subheader("🗺️ Карта на маршрута")
+
+    # Центриране на картата на първия град
+    start_coords = city_info[cities[0]]['coords']
+    m = folium.Map(location=start_coords, zoom_start=5)
+
+    # Добавяне на маркери и линии
+    coords_list = []
+    for city in cities:
+        coords = city_info[city]['coords']
+        coords_list.append(coords)
+        folium.Marker(
+            location=coords,
+            popup=f"{city}\n{city_info[city]['sight']}",
+            tooltip=city
+        ).add_to(m)
+
+    # Линия по маршрута
+    folium.PolyLine(coords_list, color="blue", weight=3, opacity=0.7).add_to(m)
+
+    # Показване в Streamlit
+    st_data = st_folium(m, width=700, height=500)
